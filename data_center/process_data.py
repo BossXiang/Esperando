@@ -141,10 +141,11 @@ with open(finance_titles_file, 'r', encoding='utf-8') as f:
         finance_title_dict[idx] = { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {}, 'status': status }
 
 # Finance
+print('Processing Finance corpus...')
 finance_pdfplumber = loadPk('datasets/raw_data_pdfplumber/finance.pkl')
 idx = 0
 n_fold = 2
-sep_window = 120
+sep_window = 100
 sep_interval = sep_window // n_fold
 num_start, num_end = 0, 1035   # exclusive of num_end
 res_dict, idx_dict = {}, {}
@@ -165,9 +166,9 @@ for i in range(num_start, num_end):
     idx_dict[i] = []
     sep_i = sep_interval
     if i in finance_title_dict: 
-        if finance_title_dict[i]['status'] == Status.Full: sep_i = 30
-        elif finance_title_dict[i]['status'] == Status.Half: sep_i = 60
-        elif finance_title_dict[i]['status'] == Status.CompanyOnly: sep_i = 90
+        if finance_title_dict[i]['status'] == Status.Full: sep_i = 25
+        elif finance_title_dict[i]['status'] == Status.Half: sep_i = 50
+        elif finance_title_dict[i]['status'] == Status.CompanyOnly: sep_i = 75
         else: raise ValueError('Invalid status')
     # Truncate the content into multiple segments
     for start_idx in range(0, len(content), sep_i):
@@ -199,15 +200,17 @@ pickle.dump(idx_dict, open(output_idx_file, 'wb'))
 
 
 # Insurance
+print('Processing Insurance corpus...')
+insurance_pdfplumber = loadPk('datasets/raw_data_pdfplumber/insurance.pkl')
 idx = 0
 n_fold = 3
-sep_window = 90
+sep_window = 150
 sep_interval = sep_window // n_fold
 num_start, num_end =  1, 644  # exclusive of num_end
 res_dict, idx_dict = {}, {}
 for i in range(num_start, num_end):
-    filename = f'{prefix}\\insurance\\insurance_{i}{postfix}'
-    content = loadPk(filename)
+    # Retrieve content from the result with pdfplumber
+    content = insurance_pdfplumber[i]
     content = content.lower()
 
     idx_dict[i] = []
@@ -229,6 +232,7 @@ pickle.dump(idx_dict, open(output_idx_file, 'wb'))
 
 
 # FAQ
+print('Processing faq corpus...')
 idx = 0
 res_dict, idx_dict = {}, {}
 with open(f'{prefix}\\pid_map_content.json', 'rb') as f_s:
