@@ -23,7 +23,7 @@ To set up the environment for this project, follow these steps:
 python -m venv venv
 ```
 
- 2. **Activate the virtual environment**:
+2. **Activate the virtual environment**:
 ```bash
 venv\Scripts\activate
 ```
@@ -36,7 +36,7 @@ pip install -r requirements.txt
 4. **Other dependencies**:
 	a. [Data extraction] [Tesseract-OCR](https://github.com/tesseract-ocr/tesseract)
 
- 5. **Third party API keys**:
+5. **Third party API keys**:
 	a. [Data extraction] [Google API](https://cloud.google.com/use-cases/ocr)
 	b. [Data Processing & Retrieval] [Voyage AI API](https://dash.voyageai.com)
 
