@@ -149,7 +149,7 @@ def finance_model(q_dict, corpus_dict, index_dict):
     
     # Initial Retrieval
     bm25 = BM25Okapi(tokenized_corpus)  # 使用BM25演算法建立檢索模型
-    ans = bm25.get_top_n(query_tokens, list(filtered_corpus), n=15)  # 根據查詢語句檢索，返回最相關的文檔，其中n為可調整項
+    ans = bm25.get_top_n(query_tokens, list(filtered_corpus), n=30)  # 根據查詢語句檢索，返回最相關的文檔，其中n為可調整項
     res = [ a['source'] for a in ans ]
 
     # Final reranking (Without embedding-based retrieval first)
@@ -185,7 +185,7 @@ def insurance_model(q_dict, corpus_dict, index_dict):
     
     # Initial Retrieval
     bm25 = BM25Okapi(tokenized_corpus)  # 使用BM25演算法建立檢索模型
-    ans = bm25.get_top_n(query_tokens, list(filtered_corpus), n=7)  # 根據查詢語句檢索，返回最相關的文檔，其中n為可調整項
+    ans = bm25.get_top_n(query_tokens, list(filtered_corpus), n=20)  # 根據查詢語句檢索，返回最相關的文檔，其中n為可調整項
     res = [ a['source'] for a in ans ]
 
     # Final reranking
@@ -219,7 +219,7 @@ def faq_model(q_dict, corpus_dict, index_dict):
     global total_usage
     vo = voyageai.Client()
     # Initial retrieval
-    k = 7
+    k = 10
     query_embeddings = q_dict['embedding']
     similarities = cosine_similarity([query_embeddings], embedding_list)
     similarities = similarities[0]
