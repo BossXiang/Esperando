@@ -10,12 +10,16 @@ from PIL import Image
 
 pytesseract.pytesseract.tesseract_cmd = 'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'  # 設定tesseract.exe的路徑
 
+
 def faq_to_str(faq):
+    ''' formulate the faq content into string '''
     # return ' '.join(i['question'] + ' ' + ' '.join(i['answers']) for i in faq)
     return ' '.join(i['question'] for i in faq)
 
+
 # 載入參考資料，返回一個字典，key為檔案名稱，value為PDF檔內容的文本
 def load_data(source_path):
+    ''' Given a source_path to a pdf, read the pdf, collate the data into a dictionary and return it '''
     masked_file_ls = os.listdir(source_path)  # 獲取資料夾中的檔案列表
     corpus_dict = {int(file.replace('.pdf', '')): read_pdf_with_table_image(os.path.join(source_path, file)) for file in tqdm(masked_file_ls)}  # 讀取每個PDF文件的文本，並以檔案名作為鍵，文本內容作為值存入字典
     return corpus_dict
@@ -23,6 +27,10 @@ def load_data(source_path):
 
 # 讀取單個PDF文件並返回其文本內容
 def read_pdf(pdf_loc, page_infos: list = None):
+    '''
+    Vanilla read_pdf function (provided by E.SUN)
+    However, this is not used in this project
+    '''
     pdf = pdfplumber.open(pdf_loc)  # 打開指定的PDF文件
 
     # TODO: 可自行用其他方法讀入資料，或是對pdf中多模態資料（表格,圖片等）進行處理
@@ -38,7 +46,9 @@ def read_pdf(pdf_loc, page_infos: list = None):
 
     return pdf_text  # 返回萃取出的文本
 
+
 def read_pdf_with_table_image(pdf_loc, page_infos: list = None):
+    ''' An improvement of the read_pdf function where it captures the tables and images in the pdf. '''
     # Parameters
     image_threshold = 1000  # Threshold for filtering small images
 
@@ -91,7 +101,9 @@ def read_pdf_with_table_image(pdf_loc, page_infos: list = None):
     return pdf_text  # Return extracted text
 
 
+
 if __name__ == "__main__":
+    ''' Main function, used to extract data from the pdf files and save them into dictionaries '''
     # 使用argparse解析命令列參數
     parser = argparse.ArgumentParser(description='Process some paths and files.')
     parser.add_argument('--source_path', default='../reference', type=str, help='讀取參考資料路徑')  # 參考資料的路徑

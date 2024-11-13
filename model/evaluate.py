@@ -1,7 +1,11 @@
 import json
 import argparse
 
+
 if __name__ == "__main__":
+    '''
+    Providing a function to evaluate the model's performance given a ground truth and a prediction file
+    '''
     # 使用argparse解析命令列參數
     parser = argparse.ArgumentParser(description='Process some paths and files.')
     parser.add_argument('--ground_truth_path', default='../dataset/preliminary/ground_truths_example.json', type=str, help='The json file to ground truth')  

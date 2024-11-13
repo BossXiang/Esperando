@@ -24,7 +24,9 @@ class Category(Enum):
     Other = 'other'
 
 
+
 def remove_punctuation(text):
+    ''' Remove all the content in text and returns it '''
     # Define a regex pattern to match English punctuation, Traditional Chinese punctuation, and digits
     pattern = r'[！-／：-＠，-．「」『』（）【】、。—・…“”‘’,.\n]*'
     # Use re.sub to replace matches with an empty string
@@ -33,6 +35,7 @@ def remove_punctuation(text):
 
 
 def partial_match(source, text):
+    ''' Returns True if source contains text '''
     i, n = 0, len(source)
     for c in text:
         while i < n and source[i] != c: i += 1
@@ -42,22 +45,29 @@ def partial_match(source, text):
 
 
 def load_text(filepath):
+    ''' Given a filepath, return a set of lines in the file '''
     with open(filepath, 'r', encoding='utf-8') as f:
         lines = set(f.read().splitlines())
     return lines
 
 
 def date_rewriting(text, season_expansion = False):
+    '''
+    Given a text, convert all the dates in the text to Chinese numerals
+        - season_expansion: Whether to expand months to seasons (e.g. "1月" -> "第一季")
+    '''
     text = text.replace('  ', ' ')
     num_to_cn = {'0': '零', '1': '一', '2': '二', '3': '三', '4': '四', '5': '五', '6': '六', '7': '七', '8': '八', '9': '九', '10': '十', '11': '十一', '12': '十二'}
     # Convert "2029年" to Taiwan year in Chinese numerals, like "一一八年"
     def convert_year_to_cn(year):
+        ''' Convert a year to Taiwan year in Chinese numerals '''
         taiwan_year = int(year) % 1911  # Convert to Taiwan calendar year
         if (taiwan_year < 0 or taiwan_year > 163): return ''    # Invalid year
         taiwan_year_str = str(taiwan_year)
         return ''.join(num_to_cn[digit] for digit in taiwan_year_str) + '年'
     # Convert "1-12月" and "1-31日" to Chinese numerals
     def convert_to_cn(prefix, match, suffix):
+        ''' Convert a number to Chinese numerals '''
         number = int(match.group(1))
         if number <= 10:
             return f"{prefix}{num_to_cn[str(number)]}{suffix}"
@@ -86,6 +96,9 @@ def date_rewriting(text, season_expansion = False):
 
 # 根據查詢語句和指定的來源，檢索答案
 def retrieval_model(q_dict, corpus_dict, index_dict, category):
+    '''
+    given a query and a corpus, assign the query to a model (finance, insurance or faq) based on its category and return the most relevant document
+    '''
     if category == Category.Finance:
         return finance_model(q_dict, corpus_dict, index_dict)
     elif category == Category.Insurance:
@@ -97,10 +110,18 @@ DEBUG_MODE = False
 # Load auxiliary files
 load_dotenv('../.env')
 voyage_api_key = os.getenv("VOYAGE_API_KEY")
-stopwords_file = '../data_center/others/cn_stopwords.txt'
+stopwords_file = '../Preprocess/others/cn_stopwords.txt'        # Reference : https://github.com/goto456/stopwords/blob/master/cn_stopwords.txt
 stopword_list = load_text(stopwords_file)
 
-finance_accountant_file = '../data_center/others/finance_annotation_accountant.txt'
+'''
+Load the finance accountant data and preprocess it to obtain a dictionary for later retrieval purposes. The format of the dictionary is as follows:
+{
+    id: { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {} }, 
+    id: { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {} }, 
+    id: { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {} }, 
+}
+'''
+finance_accountant_file = '../Preprocess/others/finance_annotation_accountant.txt'
 finance_accountant_dict = {}
 with open(finance_accountant_file, 'r', encoding='utf-8') as f:
     raw_text = f.read()
@@ -124,6 +145,14 @@ with open(finance_accountant_file, 'r', encoding='utf-8') as f:
 
 total_usage = 0
 def finance_model(q_dict, corpus_dict, index_dict):
+    '''
+    Given a query and the corpus of finance documents, return the most relevant document.
+    Workflow:
+        1. Preprocess the query
+        2. Preprocess the documents
+        3. Initial retrieval using BM25
+        4. Reranking using Voyage AI Reranker2
+    '''
     # Query preprocessing
     query = q_dict['query']
     query = date_rewriting(query)
@@ -138,7 +167,8 @@ def finance_model(q_dict, corpus_dict, index_dict):
 
     # Data preparation
     for file in source:
-        if file in finance_accountant_dict:
+        # Expansion on annotated accountant dictionary
+        if file in finance_accountant_dict: 
             filtered_corpus.append(finance_accountant_dict[file])
             tokens = finance_accountant_dict[file]['tokens']
             tokenized_corpus.append(tokens)
@@ -149,7 +179,7 @@ def finance_model(q_dict, corpus_dict, index_dict):
     
     # Initial Retrieval
     bm25 = BM25Okapi(tokenized_corpus)  # 使用BM25演算法建立檢索模型
-    ans = bm25.get_top_n(query_tokens, list(filtered_corpus), n=30)  # 根據查詢語句檢索，返回最相關的文檔，其中n為可調整項
+    ans = bm25.get_top_n(query_tokens, list(filtered_corpus), n=40)  # 根據查詢語句檢索，返回最相關的文檔，其中n為可調整項
     res = [ a['source'] for a in ans ]
 
     # Final reranking (Without embedding-based retrieval first)
@@ -166,6 +196,14 @@ def finance_model(q_dict, corpus_dict, index_dict):
 
 
 def insurance_model(q_dict, corpus_dict, index_dict):
+    '''
+    Given a query and the corpus of insurance documents, return the most relevant document.
+    Workflow:
+        1. Preprocess the query
+        2. Preprocess the documents
+        3. Initial retrieval using BM25
+        4. Reranking using Voyage AI Reranker2
+    '''
     # Query preprocessing
     query = q_dict['query']
     query_tokens = list(jieba.cut_for_search(query))
@@ -185,7 +223,7 @@ def insurance_model(q_dict, corpus_dict, index_dict):
     
     # Initial Retrieval
     bm25 = BM25Okapi(tokenized_corpus)  # 使用BM25演算法建立檢索模型
-    ans = bm25.get_top_n(query_tokens, list(filtered_corpus), n=20)  # 根據查詢語句檢索，返回最相關的文檔，其中n為可調整項
+    ans = bm25.get_top_n(query_tokens, list(filtered_corpus), n=25)  # 根據查詢語句檢索，返回最相關的文檔，其中n為可調整項
     res = [ a['source'] for a in ans ]
 
     # Final reranking
@@ -202,6 +240,14 @@ def insurance_model(q_dict, corpus_dict, index_dict):
 
 
 def faq_model(q_dict, corpus_dict, index_dict):
+    '''
+    Given a query and the corpus of finance documents, return the most relevant document.
+    Workflow:
+        1. Preprocess the query
+        2. Preprocess the documents
+        3. Initial retrieval using Embedding-based retrieval
+        4. Reranking using Voyage AI Reranker2
+    '''
     # Query preprocessing
     query = q_dict['query']
 
@@ -239,10 +285,13 @@ def faq_model(q_dict, corpus_dict, index_dict):
 
 
 if __name__ == "__main__":
+    '''
+    Given a set of questions, retrieve the most relevant document for each question and save the results in a json file.
+    '''
     # 使用argparse解析命令列參數
     parser = argparse.ArgumentParser(description='Process some paths and files.')
-    parser.add_argument('--question_path', default='../dataset/preliminary/questions_example.json', type=str, help='讀取發布題目路徑')  # 問題文件的路徑
-    parser.add_argument('--dict_path', default='../data_center/datasets/esp_dicts', type=str, help='The path to the dicts (created by preprocess.py)')  # 參考資料的路徑
+    parser.add_argument('--question_path', default='../dataset/preliminary/questions_preliminary.json', type=str, help='讀取發布題目路徑')  # 問題文件的路徑
+    parser.add_argument('--dict_path', default='../Preprocess/datasets/esp_dicts', type=str, help='The path to the dicts (created by preprocess.py)')  # 參考資料的路徑
     parser.add_argument('--output_path', default='preds/output.json', type=str, help='輸出符合參賽格式的答案路徑')  # 答案輸出的路徑
     args = parser.parse_args()  # 解析參數
 

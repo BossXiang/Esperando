@@ -7,12 +7,28 @@ from enum import Enum
 from dotenv import load_dotenv
 import voyageai
 
+''' Obtain environment variables '''
+load_dotenv('../.env')
+voyage_api_key = os.getenv("VOYAGE_API_KEY")
+
 def load_text(filepath):
+    '''
+    Given a filepath, load the text file and return the content as a set of lines. 
+    '''
     with open(filepath, 'r', encoding='utf-8') as f:
         lines = set(f.read().splitlines())
     return lines
 
+
 def load_finance_titles(filepath):
+    '''
+    Given the filepath to a finance title file, load the content and return a dictionary with the following structure:
+    {
+    source: { 'company': company, 'report_type': report_type, 'date': date },
+    source: { 'company': company, 'report_type': report_type, 'date': date },
+    source: { 'company': company, 'report_type': report_type, 'date': date },
+    }
+    '''
     finance_titles = {}
     with open(filepath, 'r', encoding='utf-8') as f:
         lines = f.read().splitlines()
@@ -25,22 +41,34 @@ def load_finance_titles(filepath):
 
 
 def loadPk(filename):
+    '''
+    Given a filepath of a pickle file, load the content and return it
+    '''
     with open(filename, 'rb') as f:
         return pickle.load(f)
     
 
 def remove_stopwords(tokens, stopword_list):
+    '''
+    Remove the stopwords from tokens against the stopword list
+    '''
     # chinese_number_pattern = r'^[一二三四五六七八九十百千万億兆]+$'
     # tokens = [token for token in tokens if not re.match(chinese_number_pattern, token)] # Remove Chinese numbers
     return [token for token in tokens if token not in stopword_list and len(token) > 1]
 
 
 def is_pure_punctuation_or_numbers(text):
+    '''
+    Return whether the text consists solely of punctuations and numbers
+    '''
     pattern = r'^[\d\W]+$'
     return bool(re.fullmatch(pattern, text))
 
 
 def distribution_analysis(content):
+    '''
+    Given a piece of text, return the distribution of Chinese characters, English letters, punctuation, and numbers
+    '''
     chinese_characters = len(re.findall(r'[\u4e00-\u9fff]', content))
     english_letters = len(re.findall(r'[a-zA-Z]', content))
     punctuation = len(re.findall(r'[^\w\s]', content))  # Non-alphanumeric and non-space 
@@ -49,20 +77,31 @@ def distribution_analysis(content):
 
 
 def is_exhaustive_table(content):
+    '''
+    Given a piece of text, return whether the proportion of Chinese characters is significantly larger than the sum of English letters, punctuation, and numbers
+    This is typically used differentiate different types of documents
+    '''
     chinese_characters, english_letters, punctuation, numbers = distribution_analysis(content)
     return chinese_characters < english_letters + punctuation + numbers
 
 
 def date_rewriting(text, season_expansion = False, purify_text = False):
+    '''
+    Given a piece of text, rewrite the date in the text to Chinese numerals
+    season_expansion: whether to expand the month to season, like "2月" to "第一季二月"
+    purify_text: whether to deep_clean the text, like removing all the numbers and spaces
+    '''
     num_to_cn = {'0': '○', '1': '一', '2': '二', '3': '三', '4': '四', '5': '五', '6': '六', '7': '七', '8': '八', '9': '九', '10': '十', '11': '十一', '12': '十二'}
     # Convert "2029年" to Taiwan year in Chinese numerals, like "一一八年"
     def convert_year_to_cn(year):
+        ''' Given a year in integer format, convert it to Taiwan year in Chinese numerals '''
         taiwan_year = int(year) % 1911  # Convert to Taiwan calendar year
         if (taiwan_year < 0 or taiwan_year > 163): return ''    # Invalid year
         taiwan_year_str = str(taiwan_year)
         return ''.join(num_to_cn[digit] for digit in taiwan_year_str) + '年'
     # Convert "1-12月" and "1-31日" to Chinese numerals
     def convert_to_cn(prefix, match, suffix):
+        ''' Given a number in integer format, convert it to Chinese numerals '''
         number = int(match.group(1))
         if number <= 10:
             return f"{prefix}{num_to_cn[str(number)]}{suffix}"
@@ -100,14 +139,31 @@ postfix = '.pkl'
 output_folder = 'datasets\\esp_dicts'
 
 # Stopwords
-stopwords_file = '../data_center/others/cn_stopwords.txt'
+stopwords_file = 'others/cn_stopwords.txt'      # Reference : https://github.com/goto456/stopwords/blob/master/cn_stopwords.txt
 stopword_list = load_text(stopwords_file)
 
+'''
+Load the annotated finance title content and format it into a dictionary in this format:
+{
+    id: { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {}, 'status': status },
+    id: { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {}, 'status': status },
+    id: { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {}, 'status': status },
+}
+'''
 # Finacne title dict
 class Status(Enum):
+    ''' Enum class for different annotation statuses. '''
     Full = 'full'
     Half = 'half'
     CompanyOnly = 'company_only'
+'''
+Read in the annotation file and format the content into a dictionary in this format:
+{
+    id: { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {}, 'status': status },
+    id: { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {}, 'status': status },
+    id: { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {}, 'status': status },
+}
+'''
 finance_titles_file = 'others/finance_annotation_title.txt'
 finance_title_dict = {}
 with open(finance_titles_file, 'r', encoding='utf-8') as f:
@@ -140,6 +196,19 @@ with open(finance_titles_file, 'r', encoding='utf-8') as f:
         tokens = list(jieba.cut_for_search(content))
         finance_title_dict[idx] = { 'source': idx, 'text': content, 'tokens': tokens, 'metadata': {}, 'status': status }
 
+'''
+Process the Finance corpus. The workflow is as follows:
+1. Load the content from the OCR result
+2. Load the content from the PDF plumber result
+3. Rewrite the date in the content to Chinese numerals
+4. Truncate the content into multiple segments and tokenize them. If the id being processed is in the annotated title dictionary, expand the content with the title (dynamically determined with the annotation information status)
+    - There are 3 types of data status in the annotation: Full, Half, CompanyOnly
+        - Full: With the title, document type, and company name
+        - Half: With the title and company name
+        - CompanyOnly: With only the company name
+5. Do the same thing as in step 4 on the PDF plumber content
+6. Save the result into a pickle file
+'''
 # Finance
 print('Processing Finance corpus...')
 finance_pdfplumber = loadPk('datasets/raw_data_pdfplumber/finance.pkl')
@@ -198,7 +267,12 @@ os.makedirs(os.path.dirname(output_file), exist_ok=True)
 pickle.dump(res_dict, open(output_file, 'wb'))
 pickle.dump(idx_dict, open(output_idx_file, 'wb'))
 
-
+'''
+Process the Insurance corpus. The workflow is as follows:
+1. Load the content from the PDF plumber result
+2. Truncate the content into multiple segments (using a sliding window of size 150 with 66% overlap) and tokenize them. 
+3. Save the result into pickle files
+'''
 # Insurance
 print('Processing Insurance corpus...')
 insurance_pdfplumber = loadPk('datasets/raw_data_pdfplumber/insurance.pkl')
@@ -230,7 +304,11 @@ os.makedirs(os.path.dirname(output_file), exist_ok=True)
 pickle.dump(res_dict, open(output_file, 'wb'))
 pickle.dump(idx_dict, open(output_idx_file, 'wb'))
 
-
+'''
+Process the FAQ corpus. The workflow is as follows:
+1. Load the content from the pid_map_content.json
+2. Formulate the question and the answers into a single text for each QA pair, and tokenize them
+'''
 # FAQ
 print('Processing faq corpus...')
 idx = 0
@@ -250,9 +328,11 @@ with open(f'{prefix}\\pid_map_content.json', 'rb') as f_s:
             idx_dict[key].append(idx)
             idx += 1
 
+'''
+Obtain the embeddings for the FAQ corpus using the Voyage AI API.
+Finally, save the result into pickle files
+'''
 # Encode the result into embeddings
-load_dotenv('../.env')
-voyage_api_key = os.getenv("VOYAGE_API_KEY")
 batch_size = 30
 keys = list(idx_dict.keys())
 vo = voyageai.Client()
