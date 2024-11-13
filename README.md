@@ -16,7 +16,7 @@
 
 ## Environment Setup
 
-The python version in our development environment is `**3.10.7**` on `**Windows11**`
+The python version in our development environment is `3.10.7` on `Windows11`
 
 To set up the environment for this project, follow either **Automatic Setup** or **Manual Setup**:
 
