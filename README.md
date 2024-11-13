@@ -147,6 +147,7 @@ python extract_data_pdfplumber.py
     - `cn_stopwords.txt`
     - `finance_annotation_accountant.txt`
     - `finance_annotation.txt`
+    - `README.md`
   - `extract_data_google_ocr.py`
   - `extract_data_pdfplumber.py`
   - `process_data.py`
